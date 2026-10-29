@@ -1,7 +1,9 @@
 pipeline {
     agent any
     environment {
-        IMAGE = "arpan050/react-cicd-app"
+        IMAGE   = "YOUR_DOCKERHUB_NAME/react-cicd-app"
+        CLUSTER = "react-eks"
+        REGION  = "us-east-1"
     }
     stages {
         stage('Install Dependencies') {
@@ -28,23 +30,43 @@ pipeline {
             }
         }
         stage('Trivy Filesystem Scan') {
-            steps { sh 'trivy fs --skip-version-check --scanners vuln --severity HIGH,CRITICAL --exit-code 0 .' }
+            steps {
+                sh 'trivy fs --skip-version-check --scanners vuln --severity HIGH,CRITICAL --exit-code 0 .'
+            }
         }
         stage('Docker Build') {
-            steps { sh 'docker build -t $IMAGE:$BUILD_NUMBER -t $IMAGE:latest .' }
+            steps {
+                sh 'docker build -t $IMAGE:$BUILD_NUMBER -t $IMAGE:latest .'
+            }
         }
         stage('Trivy Image Scan') {
-            steps { sh 'trivy image --skip-version-check --severity HIGH,CRITICAL --exit-code 0 $IMAGE:$BUILD_NUMBER' }
+            steps {
+                sh 'trivy image --skip-version-check --severity HIGH,CRITICAL --exit-code 0 $IMAGE:$BUILD_NUMBER'
+            }
         }
         stage('Docker Push') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DH_USER',
+                    passwordVariable: 'DH_PASS')]) {
                     sh '''
                       echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin
                       docker push $IMAGE:$BUILD_NUMBER
                       docker push $IMAGE:latest
                     '''
                 }
+            }
+        }
+        stage('Deploy to EKS') {
+            steps {
+                sh '''
+                  aws eks update-kubeconfig --region $REGION --name $CLUSTER
+                  sed "s#IMAGE_PLACEHOLDER#$IMAGE:$BUILD_NUMBER#" k8s/deployment.yaml | kubectl apply -f -
+                  kubectl apply -f k8s/service.yaml
+                  kubectl rollout status deployment/react-app --timeout=300s
+                  kubectl get nodes,pods,svc
+                '''
             }
         }
     }
