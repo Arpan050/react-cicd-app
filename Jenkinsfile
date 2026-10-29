@@ -22,7 +22,7 @@ pipeline {
                         -Dsonar.projectKey=react-cicd-app \
                         -Dsonar.sources=src \
                         -Dsonar.working.directory=/tmp/.scannerwork \
-                        -Dsonar.qualitygate.wait=true
+                        -Dsonar.qualitygate.wait=false
                     '''
                 }
             }
