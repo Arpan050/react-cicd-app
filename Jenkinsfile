@@ -1,7 +1,7 @@
 pipeline {
     agent any
     environment {
-        IMAGE   = "YOUR_DOCKERHUB_NAME/react-cicd-app"
+        IMAGE   = "arpan050/react-cicd-app"
         CLUSTER = "react-eks"
         REGION  = "us-east-1"
     }
